@@ -26,9 +26,12 @@ editor (p,q) = do
   c <- getKey
   when (c /= "\ESC") $ do -- TODO: implement save/load (maybe \ESC S|W)
     case c of -- TODO: maybe implement up and down arrows? 
-      "\ESC[C" -> editor (p ++ [head q], tail q) -- TODO: fix head empty list
-      "\ESC[D" -> editor (init p, [last p] ++ q) -- TODO: fix init empty list
-      "\DEL"   -> editor (init p, q)
+      "\ESC[C" -> if length q > 0 then editor (p ++ [head q], tail q) else editor (p, q) -- Right
+      "\ESC[D" -> if length p > 0 then editor (init p, [last p] ++ q) else editor (p, q) -- Left
+      "\DEL"   -> if length p > 0 then editor (init p, q) else editor (p, q)             -- Delete
+      "("      -> editor (p ++ "(", ")" ++ q)
+      "<"      -> editor (p ++ "<", ">" ++ q)
+      "{"      -> editor (p ++ "{", "}" ++ q)
       _        -> editor (p ++ c,q)
 
 main = do
