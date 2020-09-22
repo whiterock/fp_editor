@@ -26,9 +26,18 @@ editor (p,q) = do
   c <- getKey
   when (c /= "\ESC") $ do -- TODO: implement save/load (maybe \ESC S|W)
     case c of -- TODO: maybe implement up and down arrows? 
-      "\ESC[C" -> if length q > 0 then editor (p ++ [head q], tail q) else editor (p, q) -- Right
-      "\ESC[D" -> if length p > 0 then editor (init p, [last p] ++ q) else editor (p, q) -- Left
-      "\DEL"   -> if length p > 0 then editor (init p, q) else editor (p, q)             -- Delete
+      "\ESC[C" -> if not (null q) then editor (p ++ [head q], tail q) else editor (p, q) -- Right
+      "\ESC[D" -> if not (null p) then editor (init p, last p : q) else editor (p, q) -- Left
+      "\DEL"   -> if not (null p) then -- Delete
+                    if not (null q) && 
+                      ((last p == '(' && head q == ')') || 
+                      (last p == '<' && head q == '>') || 
+                      (last p == '{' && head q == '}')) then
+                      editor (init p, tail q) -- Delete additional parens
+                    else
+                      editor (init p, q)
+                  else 
+                    editor (p, q)             
       "("      -> editor (p ++ "(", ")" ++ q)
       "<"      -> editor (p ++ "<", ">" ++ q)
       "{"      -> editor (p ++ "{", "}" ++ q)
