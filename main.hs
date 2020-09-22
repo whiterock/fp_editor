@@ -14,13 +14,33 @@ moveCursorTo a b = putStr ("\ESC[" ++ show a ++ ";" ++ show b ++"H")
 count   :: Eq a => a -> [a] -> Int
 count x =  length . filter (==x)
 
+-- Gets us 6 different colors for an arbit. integer
+color :: Int -> [Char]
+color (v) = "\ESC[" ++ show (31 + (v `mod` 6)) ++ "m"
+
+-- remaining string, position, position_to_watch, current_level, level_to_highlight
+type Stream = ([Char], Int, Int, Int, Int)
+
+highlight :: Stream -> IO()
+highlight (s, pos, pos_watch, lvl, lvl_end)
+  | null s = putStr ""
+  | otherwise = do
+    let next_level | head s == '(' = lvl + 1
+                   | head s == ')' = lvl - 1
+                   | otherwise = lvl
+    if next_level /= lvl then
+      putStr ( color(if next_level > lvl then lvl else next_level) ++ [head s] ++ "\ESC[0m" )
+    else
+      putChar (head s)
+    highlight (tail s, pos+1, pos_watch, next_level, lvl_end)
+
 type Text = ([Char], [Char])
 
 editor :: Text -> IO()
 editor (p,q) = do
   clear
   moveCursorTo 0 0
-  putStr (p ++ q)
+  highlight ((p ++ q), 0, length p, 0, -1)
   moveCursorTo (count '\n' p + 1) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
   hFlush stdout
   c <- getKey
@@ -47,4 +67,4 @@ main = do
   hSetBuffering stdin NoBuffering
   hSetEcho stdin False
   clear
-  editor ([],[' '])
+  editor ([],"((<y>(<x>(- y x)) 5) 3)")
