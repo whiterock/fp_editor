@@ -26,16 +26,23 @@ color (v) = "\ESC[" ++ show (31 + (v `mod` 6)) ++ "m"
 type Stream = ([Char], Int, Int, Int, Maybe Int)
 
 highlight :: Stream -> IO()
-highlight (s, pos, pos_watch, lvl, lvl_oi)
+highlight (s, pos, pos_watch, lvl, lvl_oi) -- pos_watch is unused as of now, but could be used for putting cursor here.
   | null s = putStr ""
   | otherwise = do
     let next_level | head s == '(' || head s == '{' = lvl + 1
                    | head s == ')' || head s == '}' = lvl - 1
                    | otherwise = lvl
     if next_level /= lvl then
-      -- todo: figure out the conditions that have to be met here for special highlighting
-      -- (for instance: pos <= pos_watch for a starting paren and the lvl correct)
-      putStr ( color(if next_level > lvl then lvl else next_level) ++ [head s] ++ "\ESC[0m" )
+      if next_level > lvl then
+        if isJust lvl_oi && lvl == fromJust lvl_oi then
+          putStr (color lvl ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m") -- underline
+        else
+          putStr (color lvl ++ [head s] ++ "\ESC[0m")
+      else
+        if isJust lvl_oi && next_level == fromJust lvl_oi then
+          putStr (color next_level ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m" ) -- underline
+        else
+          putStr (color next_level ++ [head s] ++ "\ESC[0m" )
     else
       putChar (head s)
     highlight (tail s, pos+1, pos_watch, next_level, lvl_oi)
@@ -72,7 +79,9 @@ editor (p,q) = do
   if c == "\ESC" then return (p,q) -- promote Text to IO Text
     else do
       case c of -- TODO: maybe implement up and down arrows? 
-        "\ESC[C" -> if not (null q) then editor (p ++ [head q], tail q) else editor (p, q) -- Right FIXME: this fails again, dunno y
+        "\ESC[A" -> editor (p, q) -- Up, identity currently
+        "\ESC[B" -> editor (p, q) -- Down, --- = ---
+        "\ESC[C" -> if length q > 1 then editor (p ++ [head q], tail q) else editor (p, q) -- Right, needs > 1 for whatever reason
         "\ESC[D" -> if not (null p) then editor (init p, last p : q) else editor (p, q) -- Left
         "\DEL"   -> if not (null p) then -- Delete
                       if not (null q) && 
@@ -87,6 +96,7 @@ editor (p,q) = do
         "("      -> editor (p ++ "(", ")" ++ q)
         "<"      -> editor (p ++ "<", ">" ++ q)
         "{"      -> editor (p ++ "{", "}" ++ q)
+        "\t"     -> editor (p ++ "  ", q)
         _        -> editor (p ++ c,q) --TODO: careful about other escape sequences (like up and down arrow.)
 
 getContent :: String -> IO String
@@ -111,7 +121,7 @@ loop n t = do
 main :: IO ()
 main = do
   args <- getArgs
-  when (length args == 0) (putStr "no filename provided!\n" >> exitWith ExitSuccess)
+  when (length args == 0) (putStr "no filename provided!\n" >> exitWith ExitSuccess) -- FIXME: success?
   c <- getContent $ head args
 
   hSetBuffering stdin NoBuffering
