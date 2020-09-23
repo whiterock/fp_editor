@@ -23,56 +23,67 @@ color :: Int -> [Char]
 color (v) = "\ESC[" ++ show (31 + (v `mod` 6)) ++ "m"
 
 -- remaining string, position, position_to_watch, current_level, level_to_highlight
-type Stream = ([Char], Int, Int, Int, Maybe Int)
+type Stream = ([Char], Int, Maybe Int, Maybe Int, Int)
 
 highlight :: Stream -> IO()
-highlight (s, pos, pos_watch, lvl, lvl_oi) -- pos_watch is unused as of now, but could be used for putting cursor here.
+highlight (s, pos, pos_match_left, pos_match_right, lvl) -- pos_watch is unused as of now, but could be used for putting cursor here.
   | null s = putStr ""
   | otherwise = do
     let next_level | head s == '(' || head s == '{' = lvl + 1
                    | head s == ')' || head s == '}' = lvl - 1
                    | otherwise = lvl
     if next_level /= lvl then
-      if next_level > lvl then
-        if isJust lvl_oi && lvl == fromJust lvl_oi then
-          putStr (color lvl ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m") -- underline
-        else
-          putStr (color lvl ++ [head s] ++ "\ESC[0m")
+      if next_level > lvl then 
+      --  putStr (color lvl ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m") -- underline
+      putStr (color lvl ++ (if isJust pos_match_left && pos == fromJust pos_match_left then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m")
       else
-        if isJust lvl_oi && next_level == fromJust lvl_oi then
-          putStr (color next_level ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m" ) -- underline
-        else
-          putStr (color next_level ++ [head s] ++ "\ESC[0m" )
+      --  putStr (color next_level ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m" ) -- underline
+      putStr (color next_level ++ (if isJust pos_match_right && pos == fromJust pos_match_right then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m" )
     else
       putChar (head s)
-    highlight (tail s, pos+1, pos_watch, next_level, lvl_oi)
+    highlight (tail s, pos+1, pos_match_left, pos_match_right, next_level)
 
-findMatch :: ([Char], Int, Int, Int) -> Maybe Int
-findMatch (s, pos, pos_watch, lvl) = do
+
+findMatchRight :: ([Char], Int, Int, Int, Maybe Int) -> Maybe Int
+findMatchRight (s, pos, pos_watch, lvl, lvl_end) = do
   let next_level | head s == '(' || head s == '{' = lvl + 1
                  | head s == ')' || head s == '}' = lvl - 1
                  | otherwise = lvl
 
-  if pos < pos_watch then
-    findMatch (tail s, pos+1, pos_watch, next_level)
-  else
-    if next_level /= lvl then
-      Just (if next_level > lvl then lvl else next_level)
+  if length s /= 0 then
+    if pos < pos_watch then
+      findMatchRight (tail s, pos+1, pos_watch, next_level, lvl_end)
     else
-      Nothing
+      if pos == pos_watch then
+        findMatchRight (tail s, pos+1, pos_watch, next_level, Just lvl)
+      else
+        if isJust lvl_end && next_level == fromJust lvl_end then
+          Just pos
+        else
+          findMatchRight (tail s, pos+1, pos_watch, next_level, lvl_end)
+  else
+    Nothing
 
 type Text = ([Char], [Char])
 
 editor :: Text -> IO Text
 editor (p,q) = do
   clear
-  let res = findMatch (p++q, 0, length p, 0)
+  moveCursorTo 0 0
+  if last p == '(' || last p == '{' || last p == ')' || last p == '}' then
+    if last p == '(' || last p == '{' then
+      highlight ((p ++ q), 0, Just (length p), findMatchRight (p++q, 0, length p, 0, Nothing), 0)
+    else
+      -- fixme
+      highlight ((p ++ q), 0, Just (length p), findMatchRight (p++q, 0, length p, 0, Nothing), 0)
+  else
+    highlight ((p ++ q), 0, Nothing, Nothing, 0)
   -- debugging begin --
   --moveCursorTo 3 0
   --putStr (show (fromMaybe 9 res))
   -- debugging end --
-  moveCursorTo 0 0
-  highlight ((p ++ q), 0, length p, 0, res)
+  --moveCursorTo 0 0
+  --highlight ((p ++ q), 0, head parens, tail parens,  0)
   moveCursorTo (count '\n' p + 1) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
   hFlush stdout
   c <- getKey
@@ -82,7 +93,7 @@ editor (p,q) = do
         "\ESC[A" -> editor (p, q) -- Up, identity currently
         "\ESC[B" -> editor (p, q) -- Down, --- = ---
         "\ESC[C" -> if length q > 1 then editor (p ++ [head q], tail q) else editor (p, q) -- Right, needs > 1 for whatever reason
-        "\ESC[D" -> if not (null p) then editor (init p, last p : q) else editor (p, q) -- Left
+        "\ESC[D" -> if length p > 1 then editor (init p, last p : q) else editor (p, q) -- Left
         "\DEL"   -> if not (null p) then -- Delete
                       if not (null q) && 
                         ((last p == '(' && head q == ')') || 
