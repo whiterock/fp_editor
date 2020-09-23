@@ -35,11 +35,11 @@ highlight (s, pos, pos_match_left, pos_match_right, lvl) -- pos_watch is unused 
                    | otherwise = lvl
     if next_level /= lvl then
       if next_level > lvl then 
-      --  putStr (color lvl ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m") -- underline
-      putStr (color lvl ++ (if isJust pos_match_left && pos == fromJust pos_match_left then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m")
+        --  putStr (color lvl ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m") -- underline
+        putStr (color lvl ++ (if isJust pos_match_left && pos == fromJust pos_match_left then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m")
       else
-      --  putStr (color next_level ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m" ) -- underline
-      putStr (color next_level ++ (if isJust pos_match_right && pos == fromJust pos_match_right then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m" )
+        --  putStr (color next_level ++ "\ESC[4m" ++ [head s] ++ "\ESC[0m" ) -- underline
+        putStr (color next_level ++ (if isJust pos_match_right && pos == fromJust pos_match_right then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m" )
     else
       putChar (head s)
     highlight (tail s, pos+1, pos_match_left, pos_match_right, next_level)
@@ -65,23 +65,46 @@ findMatchRight (s, pos, pos_watch, lvl, lvl_end) = do
   else
     Nothing
 
+findMatchLeft :: ([Char], Int, Int, Int, Maybe Int) -> Maybe Int
+findMatchLeft (s, pos, pos_watch, lvl, lvl_end) = do
+  let next_level | last s == '(' || last s == '{' = lvl - 1
+                 | last s == ')' || last s == '}' = lvl + 1
+                 | otherwise = lvl
+
+  if length s /= 0 then
+    if pos > pos_watch then
+      findMatchLeft (init s, pos-1, pos_watch, next_level, lvl_end)
+    else
+      if pos == pos_watch then
+        findMatchLeft (init s, pos-1, pos_watch, next_level, Just lvl)
+      else
+        if isJust lvl_end && next_level == fromJust lvl_end then
+          Just pos
+        else
+          findMatchLeft (init s, pos-1, pos_watch, next_level, lvl_end)
+  else
+    Nothing
+
 type Text = ([Char], [Char])
 
 editor :: Text -> IO Text
 editor (p,q) = do
   clear
   moveCursorTo 0 0
-  if last p == '(' || last p == '{' || last p == ')' || last p == '}' then
-    if last p == '(' || last p == '{' then
+  if head q == '(' || head q == '{' || head q == ')' || head q == '}' then
+    if head q == '(' || head q == '{' then
       highlight ((p ++ q), 0, Just (length p), findMatchRight (p++q, 0, length p, 0, Nothing), 0)
     else
       -- fixme
-      highlight ((p ++ q), 0, Just (length p), findMatchRight (p++q, 0, length p, 0, Nothing), 0)
+      --highlight ((p ++ q), 0, maybe Nothing (\x -> (length (p++q))-x) (findMatchRight (reverse p++q, 0, length q, 0, Nothing)), Just (length p), 0)
+      highlight ((p ++ q), 0, findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing), Just (length p), 0)
   else
     highlight ((p ++ q), 0, Nothing, Nothing, 0)
   -- debugging begin --
-  --moveCursorTo 3 0
-  --putStr (show (fromMaybe 9 res))
+  moveCursorTo 3 0
+  putStr (show (fromMaybe 9 (findMatchRight (p++q, 0, length p, 0, Nothing))))
+  putStr " "
+  putStr (show (fromMaybe 9 (findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing))))
   -- debugging end --
   --moveCursorTo 0 0
   --highlight ((p ++ q), 0, head parens, tail parens,  0)
@@ -94,7 +117,7 @@ editor (p,q) = do
         "\ESC[A" -> if lines p /= [] then editor (unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor (p, q)-- Up
         "\ESC[B" -> if (length $ lines q) > 1 then editor (p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor (p, q)-- Down
         "\ESC[C" -> if length q > 1 then editor (p ++ [head q], tail q) else editor (p, q) -- Right, needs > 1 for whatever reason
-        "\ESC[D" -> if length p > 1 then editor (init p, last p : q) else editor (p, q) -- Left
+        "\ESC[D" -> if length p > 0 then editor (init p, last p : q) else editor (p, q) -- Left
         "\DEL"   -> if not (null p) then -- Delete
                       if not (null q) && 
                         ((last p == '(' && head q == ')') || 
