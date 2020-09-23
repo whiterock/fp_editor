@@ -81,7 +81,7 @@ editor (p,q) = do
     else do
       case c of --TODO: stay at level of indentation? 
         "\ESC[A" -> if lines p /= [] then editor (unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor (p, q)-- Up
-        "\ESC[B" -> if lines q /= [] then editor (p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor (p, q)-- Down
+        "\ESC[B" -> if (length $ lines q) > 1 then editor (p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor (p, q)-- Down
         "\ESC[C" -> if length q > 1 then editor (p ++ [head q], tail q) else editor (p, q) -- Right, needs > 1 for whatever reason
         "\ESC[D" -> if not (null p) then editor (init p, last p : q) else editor (p, q) -- Left
         "\DEL"   -> if not (null p) then -- Delete
