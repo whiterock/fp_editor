@@ -1,6 +1,7 @@
 import System.IO
 import System.Environment
 import System.Directory
+import Data.List
 import System.Exit
 import Control.Monad (when)
 import Data.Maybe
@@ -89,9 +90,9 @@ editor (p,q) = do
   c <- getKey
   if c == "\ESC" then return (p,q) -- promote Text to IO Text
     else do
-      case c of -- TODO: maybe implement up and down arrows? 
-        "\ESC[A" -> editor (p, q) -- Up, identity currently
-        "\ESC[B" -> editor (p, q) -- Down, --- = ---
+      case c of --TODO: stay at level of indentation? 
+        "\ESC[A" -> if lines p /= [] then editor (unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor (p, q)-- Up
+        "\ESC[B" -> if (length $ lines q) > 1 then editor (p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor (p, q)-- Down
         "\ESC[C" -> if length q > 1 then editor (p ++ [head q], tail q) else editor (p, q) -- Right, needs > 1 for whatever reason
         "\ESC[D" -> if length p > 1 then editor (init p, last p : q) else editor (p, q) -- Left
         "\DEL"   -> if not (null p) then -- Delete
