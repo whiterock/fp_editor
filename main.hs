@@ -160,4 +160,5 @@ main = do
   hSetBuffering stdin NoBuffering
   hSetEcho stdin False
   clear
+  putStr "\ESC[?7l"
   loop (head args) (0,[],c)
