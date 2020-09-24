@@ -121,12 +121,19 @@ editor (skip,p,q)
     -- *** Status Bar *** --
     moveCursorTo (h+1) 0
     putStr "\ESC[7m"
+    putStr $ replicate w ' '
+    moveCursorTo (h+1) 0
     putStr "Current Line: "
     putStr $ show $ current_line p
-    putStr "\ESC[10C \ESC[0m"
+    putStr " Current Column: "
+    putStr $ show (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
+    if count '(' (p++q) /= count ')' (p++q) then
+      putStr " \ESC[31mSyntax Error: Unbalanced parenthesis!\ESC[0m\ESC[7m"
+    else
+      putStr ""
+    putStr "\ESC[0m"
 
-    --moveCursorTo 0 0
-    --highlight ((p ++ q), 0, head parens, tail parens,  0)
+    -- Set cursor to actual cursor position
     moveCursorTo (current_line p - skip) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
     hFlush stdout
     c <- getKey
@@ -182,5 +189,5 @@ main = do
   hSetBuffering stdin NoBuffering
   hSetEcho stdin False
   clear
-  putStr "\ESC[?7l"
+  putStr "\ESC[?7l" -- disables line wrapping (VT100)
   loop (head args) (0,[],c)
