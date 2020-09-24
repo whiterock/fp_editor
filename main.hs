@@ -1,6 +1,7 @@
 import System.IO
 import System.Environment
 import System.Directory
+import System.Console.Terminal.Size
 import Data.List
 import System.Exit
 import Control.Monad (when)
@@ -81,6 +82,7 @@ findMatchLeft (s, pos, pos_watch, lvl, lvl_end) = do
 
 type Text = (Int, [Char], [Char])
 
+
 current_line :: String -> Int
 current_line p = count '\n' p + 1 
 
@@ -89,6 +91,15 @@ editor (skip,p,q)
   | current_line p - skip == 0 = editor (skip-1, p, q)
   | current_line p - skip > 20 = editor (skip+1, p,q)
   | otherwise = do
+    -- fixme: we need h two lines above already
+    -- *** Figure out terminal size *** --
+    -- default if nothing: 80x24
+    s <- size
+    let h | isJust s = height (fromJust s)
+          | otherwise = 24
+    let w | isJust s = width (fromJust s)
+          | otherwise = 80
+
     clear
     moveCursorTo 0 0
     let s | head q == '(' || head q == '{' = highlight ((p ++ q), 0, Just (length p), findMatchRight (p++q, 0, length p, 0, Nothing), 0)
@@ -96,13 +107,24 @@ editor (skip,p,q)
           | otherwise = highlight ((p ++ q), 0, Nothing, Nothing, 0)
 
     -- TODO: 20 lines max for now?
-    putStr $ unlines $ take 20 $ drop skip $ lines s
+    --(h, w) <- size
+    --putStr (show (fromJust h))
+    putStr $ unlines (take h $ drop skip $ lines s)
+
     -- debugging begin --
-    moveCursorTo 3 0
-    putStr (show (fromMaybe 9 (findMatchRight (p++q, 0, length p, 0, Nothing))))
-    putStr " "
-    putStr (show (fromMaybe 9 (findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing))))
+    --moveCursorTo 3 0
+    --putStr (show (fromMaybe 9 (findMatchRight (p++q, 0, length p, 0, Nothing))))
+    --putStr " "
+    --putStr (show (fromMaybe 9 (findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing))))
     -- debugging end --
+
+    -- *** Status Bar *** --
+    moveCursorTo (h+1) 0
+    putStr "\ESC[7m"
+    putStr "Current Line: "
+    putStr $ show $ current_line p
+    putStr "\ESC[10C \ESC[0m"
+
     --moveCursorTo 0 0
     --highlight ((p ++ q), 0, head parens, tail parens,  0)
     moveCursorTo (current_line p - skip) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
@@ -113,7 +135,7 @@ editor (skip,p,q)
         case c of --TODO: stay at level of indentation? 
           "\ESC[A" -> if lines p /= [] then editor (skip, unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor (skip, p, q)-- Up
           "\ESC[B" -> if (length $ lines q) > 1 then editor (skip, p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor (skip, p, q)-- Down
-          "\ESC[C" -> if length q > 1 then editor (skip, p ++ [head q], tail q) else editor (skip, p, q) -- Right, needs > 1 for whatever reason
+          "\ESC[C" -> if length q > 1 then editor (skip, p ++ [head q], tail q) else editor (skip, p, q) -- Right, needs > 1 for special last char
           "\ESC[D" -> if length p > 0 then editor (skip, init p, last p : q) else editor (skip, p, q) -- Left
           "\DEL"   -> if not (null p) then -- Delete
                         if not (null q) && 
