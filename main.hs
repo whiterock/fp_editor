@@ -80,22 +80,20 @@ findMatchLeft (s, pos, pos_watch, lvl, lvl_end) = do
   else
     Nothing
 
-type Text = (Int, [Char], [Char])
+type Params = (Int, Int, Int)
+type Text = (Params, [Char], [Char])
 
 
 current_line :: String -> Int
 current_line p = count '\n' p + 1 
 
 editor :: Text -> IO Text
-editor (skip,p,q) 
-  | current_line p - skip == 0 = editor (skip-1, p, q)
-  | current_line p - skip > 20 = editor (skip+1, p,q)
+editor ((skip,w,h),p,q) 
+  | current_line p - skip == 0 = editor ((skip-1,w,h), p, q)
+  | current_line p - skip > h = editor ((skip+1,w,h), p,q)
   | otherwise = do
-    -- fixme: we need h two lines above already
-    -- *** Figure out terminal size *** --
-    -- default if nothing: 80x24
     s <- size
-    let h | isJust s = height (fromJust s)
+    let h | isJust s = height (fromJust s) -1
           | otherwise = 24
     let w | isJust s = width (fromJust s)
           | otherwise = 80
@@ -106,9 +104,6 @@ editor (skip,p,q)
           | head q == ')' || head q == '}' = highlight ((p ++ q), 0, findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing), Just (length p), 0) --fixme see below (fixed?)
           | otherwise = highlight ((p ++ q), 0, Nothing, Nothing, 0)
 
-    -- TODO: 20 lines max for now?
-    --(h, w) <- size
-    --putStr (show (fromJust h))
     putStr $ unlines (take h $ drop skip $ lines s)
 
     -- debugging begin --
@@ -136,37 +131,37 @@ editor (skip,p,q)
     moveCursorTo (current_line p - skip) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
     hFlush stdout
     c <- getKey
-    if c == "\ESC" then return (skip, p,q) -- promote Text to IO Text
+    if c == "\ESC" then return ((skip,w,h), p,q) -- promote Text to IO Text
       else do
         case c of --TODO: stay at level of indentation? 
-          "\ESC[A" -> if lines p /= [] then editor (skip, unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor (skip, p, q)-- Up
-          "\ESC[B" -> if (length $ lines q) > 1 then editor (skip, p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor (skip, p, q)-- Down
-          "\ESC[C" -> if length q > 1 then editor (skip, p ++ [head q], tail q) else editor (skip, p, q) -- Right, needs > 1 for special last char
-          "\ESC[D" -> if length p > 0 then editor (skip, init p, last p : q) else editor (skip, p, q) -- Left
+          "\ESC[A" -> if lines p /= [] then editor ((skip,w,h), unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor ((skip,w,h), p, q)-- Up
+          "\ESC[B" -> if (length $ lines q) > 1 then editor ((skip,w,h), p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor ((skip,w,h), p, q)-- Down
+          "\ESC[C" -> if length q > 1 then editor ((skip,w,h), p ++ [head q], tail q) else editor ((skip,w,h), p, q) -- Right, needs > 1 for special last char
+          "\ESC[D" -> if length p > 0 then editor ((skip,w,h), init p, last p : q) else editor ((skip,w,h), p, q) -- Left
           "\DEL"   -> if not (null p) then -- Delete
                         if not (null q) && 
                           ((last p == '(' && head q == ')') || 
                           (last p == '<' && head q == '>') || 
                           (last p == '{' && head q == '}')) then
-                          editor (skip, init p, tail q) -- Delete additional parens
+                          editor ((skip,w,h), init p, tail q) -- Delete additional parens
                         else
-                          editor (skip, init p, q)
+                          editor ((skip,w,h), init p, q)
                       else 
-                        editor (skip, p, q)             
-          "("      -> editor (skip, p ++ "(", ")" ++ q)
-          "<"      -> editor (skip, p ++ "<", ">" ++ q)
-          "{"      -> editor (skip, p ++ "{", "}" ++ q)
-          "\t"     -> editor (skip, p ++ "  ", q)
-          _        -> editor (skip, p ++ c,q) --TODO: also scroll on \n if in >>last row<< :)
+                        editor ((skip,w,h), p, q)             
+          "("      -> editor ((skip,w,h), p ++ "(", ")" ++ q)
+          "<"      -> editor ((skip,w,h), p ++ "<", ">" ++ q)
+          "{"      -> editor ((skip,w,h), p ++ "{", "}" ++ q)
+          "\t"     -> editor ((skip,w,h), p ++ "  ", q)
+          _        -> editor ((skip,w,h), p ++ c,q)
 
 getContent :: String -> IO String
 getContent name = do
-        w <- doesFileExist name --since this returns IO Bool we have to sequence it (do block) in order to use its result
+        w <- doesFileExist name
         if w then readFile name
           else do
-            h <- openFile name WriteMode --erstellt File,same thing, since its IO we have to sequence it.
-            hClose h -- close it immediately :) 
-            return [] -- promote String to IO String
+            h <- openFile name WriteMode.
+            hClose h
+            return []
 
 loop :: String -> Text -> IO ()
 loop n t = do
@@ -189,4 +184,4 @@ main = do
   hSetEcho stdin False
   clear
   putStr "\ESC[?7l" -- disables line wrapping (VT100)
-  loop (head args) (0,[],c)
+  loop (head args) ((0,80,24),[],c)
