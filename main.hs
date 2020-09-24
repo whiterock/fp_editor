@@ -159,7 +159,7 @@ getContent name = do
         w <- doesFileExist name
         if w then readFile name
           else do
-            h <- openFile name WriteMode.
+            h <- openFile name WriteMode
             hClose h
             return []
 
