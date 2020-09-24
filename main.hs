@@ -3,9 +3,11 @@ import System.Environment
 import System.Directory
 import System.Console.Terminal.Size
 import Data.List
+import Data.Char
 import System.Exit
 import Control.Monad (when)
 import Data.Maybe
+import qualified Data.Text as T
 
 getKey :: IO [Char]
 getKey = reverse <$> getKey' ""
@@ -81,13 +83,28 @@ findMatchLeft (s, pos, pos_watch, lvl, lvl_end) = do
     Nothing
 
 type Params = (Int, Int, Int)
-type Text = (Params, [Char], [Char])
+type Editorstate = (Params, [Char], [Char])
+
+isWord :: String -> Bool
+isWord = and . map isLetter
+
+getWordUnderCursor :: (String,String) -> String
+getWordUnderCursor (p,q) = current_word
+  where current_word = if isWord (pe ++ qu) then (pe ++ qu) else ""
+        pe = if null p then "" else if isSpace $ last p then "" else last $ words p
+        qu = if null q then "" else if isSpace $ head q then "" else head $ words q
+
+--TODO: remove .(){}<> from getWordUnderCursor to be more general
+--TODO: maybe only match/color in if w is surrounded by whitespace?
+highlightWords :: String -> String -> String
+highlightWords "" t = t
+highlightWords w t = T.unpack $ T.replace (T.pack w) (T.pack $ "\ESC[43m" ++ w ++ "\ESC[0m") $ T.pack t
 
 
 current_line :: String -> Int
 current_line p = count '\n' p + 1 
 
-editor :: Text -> IO Text
+editor :: Editorstate -> IO Editorstate
 editor ((skip,w,h),p,q) 
   | current_line p - skip == 0 = editor ((skip-1,w,h), p, q)
   | current_line p - skip > h = editor ((skip+1,w,h), p,q)
@@ -104,10 +121,13 @@ editor ((skip,w,h),p,q)
           | head q == ')' || head q == '}' = highlight ((p ++ q), 0, findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing), Just (length p), 0) --fixme see below (fixed?)
           | otherwise = highlight ((p ++ q), 0, Nothing, Nothing, 0)
 
-    putStr $ unlines (take h $ drop skip $ lines s)
+    --NOTE: possible optimisation involes only checking the region shown on screen
+    let r = highlightWords (getWordUnderCursor (p,q)) s
+
+    putStr $ unlines (take h $ drop skip $ lines r)
 
     -- debugging begin --
-    --moveCursorTo 3 0
+    --moveCursorTo 15 30
     --putStr (show (fromMaybe 9 (findMatchRight (p++q, 0, length p, 0, Nothing))))
     --putStr " "
     --putStr (show (fromMaybe 9 (findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing))))
@@ -131,9 +151,9 @@ editor ((skip,w,h),p,q)
     moveCursorTo (current_line p - skip) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
     hFlush stdout
     c <- getKey
-    if c == "\ESC" then return ((skip,w,h), p,q) -- promote Text to IO Text
+    if c == "\ESC" then return ((skip,w,h), p,q) -- promote Editorstate to IO Editorstate
       else do
-        case c of --TODO: stay at level of indentation? 
+        case c of --TODO: stay at level of indentation? also: reverse p such that these operations are more performant (?not sure if change in general, since reverse needed to print)
           "\ESC[A" -> if lines p /= [] then editor ((skip,w,h), unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor ((skip,w,h), p, q)-- Up
           "\ESC[B" -> if (length $ lines q) > 1 then editor ((skip,w,h), p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor ((skip,w,h), p, q)-- Down
           "\ESC[C" -> if length q > 1 then editor ((skip,w,h), p ++ [head q], tail q) else editor ((skip,w,h), p, q) -- Right, needs > 1 for special last char
@@ -159,11 +179,11 @@ getContent name = do
         w <- doesFileExist name
         if w then readFile name
           else do
-            h <- openFile name WriteMode.
+            h <- openFile name WriteMode
             hClose h
             return []
 
-loop :: String -> Text -> IO ()
+loop :: String -> Editorstate -> IO ()
 loop n t = do
         (s, p, q) <- editor t
         writeFile n (p++q++"\n")
