@@ -127,10 +127,9 @@ editor (skip,p,q)
     putStr $ show $ current_line p
     putStr " Current Column: "
     putStr $ show (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
-    if count '(' (p++q) /= count ')' (p++q) then
-      putStr " \ESC[31mSyntax Error: Unbalanced parenthesis!\ESC[0m\ESC[7m"
-    else
-      putStr ""
+    when (count '(' (p++q) /= count ')' (p++q)) (putStr " \ESC[31mError: Unbalanced '()'!\ESC[0m\ESC[7m")
+    when (count '<' (p++q) /= count '>' (p++q)) (putStr " \ESC[31mError: Unbalanced '<>'!\ESC[0m\ESC[7m")
+    when (count '{' (p++q) /= count '}' (p++q)) (putStr " \ESC[31mError: Unbalanced '{}'!\ESC[0m\ESC[7m")
     putStr "\ESC[0m"
 
     -- Set cursor to actual cursor position
