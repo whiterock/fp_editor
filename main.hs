@@ -95,7 +95,7 @@ isNotMyLetter :: Char -> Bool
 isNotMyLetter c = not ((isUpper $ c) || (isLower $ c))
 
 myWords :: String -> [String]
-myWords s | s' == ""  = [""]
+myWords s | s' == ""  = []
           | otherwise = word : myWords rest
   where s' = dropWhile isNotMyLetter s
         (word, rest) = break isNotMyLetter s'
