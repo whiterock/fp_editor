@@ -36,7 +36,7 @@ highlight (s, pos, pos_match_left, pos_match_right, lvl) -- pos_watch is unused 
     let next_level | head s == '(' || head s == '{' = lvl + 1
                    | head s == ')' || head s == '}' = lvl - 1
                    | otherwise = lvl
-        ret | next_level == lvl = [head s]
+        ret | next_level == lvl = if head s == '+' || head s == '-' || head s == '/' || head s == '*' || head s == '?' then "\ESC[1m" ++ [head s] ++ "\ESC[0m" else [head s]
             | next_level > lvl = (color lvl ++ (if isJust pos_match_left && pos == fromJust pos_match_left then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m")
             | otherwise = (color next_level ++ (if isJust pos_match_right && pos == fromJust pos_match_right then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m" )
     ret ++ highlight (tail s, pos+1, pos_match_left, pos_match_right, next_level)
@@ -100,18 +100,28 @@ myWords s | s' == ""  = []
   where s' = dropWhile isNotMyLetter s
         (word, rest) = break isNotMyLetter s'
 
+myBreak :: String -> [String]
+myBreak s | s == "" = []
+          | otherwise = do
+            let (word, rest) = break isNotMyLetter s
+            if word == "" then
+              [(head s)] : myBreak (tail rest)
+            else
+              word : myBreak rest
+
 getWordUnderCursor :: (String,String) -> String
 getWordUnderCursor (p,q) = current_word
   where current_word = if isWord (pe ++ qu) then (pe ++ qu) else ""
         pe = if null p then "" else if isNotMyLetter $ last p then "" else last $ myWords p
         qu = if null q then "" else if isNotMyLetter $ head q then "" else head $ myWords q
 
---TODO: remove .(){}<> from getWordUnderCursor to be more general
---TODO: maybe only match/color in if w is surrounded by whitespace?
+-- from https://codereview.stackexchange.com/questions/85703/replacing-items-in-a-list
+replace' :: Eq b => b -> b -> [b] -> [b]
+replace' a b = map (\x -> if (a == x) then b else x)
+
 highlightWords :: String -> String -> String
 highlightWords "" t = t
-highlightWords w t = T.unpack $ T.replace (T.pack w) (T.pack $ "\ESC[4m" ++ w ++ "\ESC[0m") $ T.pack t
-
+highlightWords w t = intercalate "" (replace' w ("\ESC[4m" ++ w ++ "\ESC[0m") (myBreak t))
 
 current_line :: String -> Int
 current_line p = count '\n' p + 1 
@@ -134,7 +144,7 @@ editor ((skip,w,h),p,q)
           | otherwise = highlight ((p ++ q), 0, Nothing, Nothing, 0)
 
     --NOTE: possible optimisation involes only checking the region shown on screen
-    let r = highlightWords (getWordUnderCursor (p,q)) s
+    let r = highlightWords (if not $ isNotMyLetter $ head q then getWordUnderCursor (p,q) else "") s
 
     putStr $ unlines (take h $ drop skip $ lines r)
 
