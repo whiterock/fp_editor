@@ -88,17 +88,29 @@ type Editorstate = (Params, [Char], [Char])
 isWord :: String -> Bool
 isWord = and . map isLetter
 
+-- needed for custom myWords.
+-- Note: Here I define a letter as ascii upper or lower
+-- Note: This doesn't include modifier letters and other funky stuff by haskell
+isNotMyLetter :: Char -> Bool
+isNotMyLetter c = not ((isUpper $ c) || (isLower $ c))
+
+myWords :: String -> [String]
+myWords s | s' == ""  = [""]
+          | otherwise = word : myWords rest
+  where s' = dropWhile isNotMyLetter s
+        (word, rest) = break isNotMyLetter s'
+
 getWordUnderCursor :: (String,String) -> String
 getWordUnderCursor (p,q) = current_word
   where current_word = if isWord (pe ++ qu) then (pe ++ qu) else ""
-        pe = if null p then "" else if isSpace $ last p then "" else last $ words p
-        qu = if null q then "" else if isSpace $ head q then "" else head $ words q
+        pe = if null p then "" else if isNotMyLetter $ last p then "" else last $ myWords p
+        qu = if null q then "" else if isNotMyLetter $ head q then "" else head $ myWords q
 
 --TODO: remove .(){}<> from getWordUnderCursor to be more general
 --TODO: maybe only match/color in if w is surrounded by whitespace?
 highlightWords :: String -> String -> String
 highlightWords "" t = t
-highlightWords w t = T.unpack $ T.replace (T.pack w) (T.pack $ "\ESC[43m" ++ w ++ "\ESC[0m") $ T.pack t
+highlightWords w t = T.unpack $ T.replace (T.pack w) (T.pack $ "\ESC[4m" ++ w ++ "\ESC[0m") $ T.pack t
 
 
 current_line :: String -> Int
@@ -145,6 +157,9 @@ editor ((skip,w,h),p,q)
     when (count '(' (p++q) /= count ')' (p++q)) (putStr " \ESC[31mError: Unbalanced '()'!\ESC[0m\ESC[7m")
     when (count '<' (p++q) /= count '>' (p++q)) (putStr " \ESC[31mError: Unbalanced '<>'!\ESC[0m\ESC[7m")
     when (count '{' (p++q) /= count '}' (p++q)) (putStr " \ESC[31mError: Unbalanced '{}'!\ESC[0m\ESC[7m")
+    --putStr $ show $ getWordUnderCursor (p,q)
+    --putStr $ show $ last $ words p
+    --putStr $ show $ head $ myWords q
     putStr "\ESC[0m"
 
     -- Set cursor to actual cursor position
@@ -172,6 +187,7 @@ editor ((skip,w,h),p,q)
           "<"      -> editor ((skip,w,h), p ++ "<", ">" ++ q)
           "{"      -> editor ((skip,w,h), p ++ "{", "}" ++ q)
           "\t"     -> editor ((skip,w,h), p ++ "  ", q)
+          -- fixme: shift + arrow keys messes everything up.
           _        -> editor ((skip,w,h), p ++ c,q)
 
 getContent :: String -> IO String
