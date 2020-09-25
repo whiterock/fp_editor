@@ -114,7 +114,12 @@ highlightWords w t = T.unpack $ T.replace (T.pack w) (T.pack $ "\ESC[4m" ++ w ++
 
 
 current_line :: String -> Int
-current_line p = count '\n' p + 1 
+current_line p = count '\n' p + 1
+
+current_column :: String -> Int
+current_column p
+    | length p == 0 || last p == '\n' = 1
+    | otherwise = (length $ last $ lines p)+1
 
 editor :: Editorstate -> IO Editorstate
 editor ((skip,w,h),p,q) 
@@ -153,7 +158,7 @@ editor ((skip,w,h),p,q)
     putStr "Current Line: "
     putStr $ show $ current_line p
     putStr " Current Column: "
-    putStr $ show (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
+    putStr $ show $ current_column p
     when (count '(' (p++q) /= count ')' (p++q)) (putStr " \ESC[31mError: Unbalanced '()'!\ESC[0m\ESC[7m")
     when (count '<' (p++q) /= count '>' (p++q)) (putStr " \ESC[31mError: Unbalanced '<>'!\ESC[0m\ESC[7m")
     when (count '{' (p++q) /= count '}' (p++q)) (putStr " \ESC[31mError: Unbalanced '{}'!\ESC[0m\ESC[7m")
@@ -163,14 +168,14 @@ editor ((skip,w,h),p,q)
     putStr "\ESC[0m"
 
     -- Set cursor to actual cursor position
-    moveCursorTo (current_line p - skip) (if length p == 0 || last p == '\n' then 1 else (length $ last $ lines p)+1)
+    moveCursorTo (current_line p - skip) (current_column p)
     hFlush stdout
     c <- getKey
     if c == "\ESC" then return ((skip,w,h), p,q) -- promote Editorstate to IO Editorstate
       else do
-        case c of --TODO: stay at level of indentation? also: reverse p such that these operations are more performant (?not sure if change in general, since reverse needed to print)
-          "\ESC[A" -> if lines p /= [] then editor ((skip,w,h), unlines $ init $ lines p, (last $ lines p) ++ (if last p == '\n' then "\n" else "") ++ q) else editor ((skip,w,h), p, q)-- Up
-          "\ESC[B" -> if (length $ lines q) > 1 then editor ((skip,w,h), p ++ (head $ lines q) ++ "\n", unlines $ tail $ lines q) else editor ((skip,w,h), p, q)-- Down
+        case c of
+          "\ESC[A" -> if (length $ lines p) > 1 then editor ((skip,w,h), (unlines $ init $ (if last p == '\n' then (lines p) else (init $ lines p))) ++ take (min (current_column p - 1) (length $ last $ init $ lines p)) (last $ init $ lines p), drop (min (current_column p - 1) (length $ last $ init $ lines p)) (if last p == '\n' then (last $ lines p)++"\n" else (last $ init $ lines p) ++"\n"++ (last $ lines p)) ++ q) else (if length p == 0 then editor ((skip,w,h), p, q) else (if last p == '\n' then editor ((skip,w,h), [], p++q) else editor ((skip,w,h), p, q)))-- Up
+          "\ESC[B" -> if (length $ lines q) > 1 then editor ((skip,w,h), p ++ (head $ lines q) ++ "\n" ++ take (min (current_column p - 1) (length $ head $ tail $ lines q)) (head $ tail $ lines q), drop (min (current_column p - 1) (length $ head $ tail $ lines q)) (head $ tail $ lines q) ++ "\n" ++ (unlines $ tail $ tail $ lines q)) else editor ((skip,w,h), p, q)-- Down
           "\ESC[C" -> if length q > 1 then editor ((skip,w,h), p ++ [head q], tail q) else editor ((skip,w,h), p, q) -- Right, needs > 1 for special last char
           "\ESC[D" -> if length p > 0 then editor ((skip,w,h), init p, last p : q) else editor ((skip,w,h), p, q) -- Left
           "\DEL"   -> if not (null p) then -- Delete
@@ -187,8 +192,7 @@ editor ((skip,w,h),p,q)
           "<"      -> editor ((skip,w,h), p ++ "<", ">" ++ q)
           "{"      -> editor ((skip,w,h), p ++ "{", "}" ++ q)
           "\t"     -> editor ((skip,w,h), p ++ "  ", q)
-          -- fixme: shift + arrow keys messes everything up.
-          _        -> editor ((skip,w,h), p ++ c,q)
+          _        -> editor ((skip,w,h), p ++ (if isPrint $ head c then c else ""),q)
 
 getContent :: String -> IO String
 getContent name = do
