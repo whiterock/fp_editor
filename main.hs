@@ -7,7 +7,6 @@ import Data.Char
 import System.Exit
 import Control.Monad (when)
 import Data.Maybe
-import qualified Data.Text as T
 
 getKey :: IO [Char]
 getKey = reverse <$> getKey' ""
@@ -195,6 +194,7 @@ editor ((skip,w,h),p,q)
           "<"      -> editor ((skip,w,h), p ++ "<", ">" ++ q)
           "{"      -> editor ((skip,w,h), p ++ "{", "}" ++ q)
           "\t"     -> editor ((skip,w,h), p ++ "  ", q)
+          "\n"     -> editor ((skip,w,h), p ++ "\n", q)
           _        -> editor ((skip,w,h), p ++ (if isPrint $ head c then c else ""),q)
 
 getContent :: String -> IO String
@@ -203,8 +203,9 @@ getContent name = do
         if w then readFile name
           else do
             h <- openFile name WriteMode
+            hPutChar h ' '
             hClose h
-            return []
+            return " "
 
 loop :: String -> Editorstate -> IO ()
 loop n t = do
@@ -220,7 +221,7 @@ loop n t = do
 main :: IO ()
 main = do
   args <- getArgs
-  when (length args == 0) (putStr "no filename provided!\n" >> exitWith ExitSuccess) -- FIXME: success?
+  when (length args == 0) (putStr "no filename provided!\n" >> exitWith ExitSuccess)
   c <- getContent $ head args
 
   hSetBuffering stdin NoBuffering
