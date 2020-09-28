@@ -1,0 +1,7 @@
+(
+    {
+        APPEND=<x>(<y>(? x {HEAD=(x HEAD), TAIL=(APPEND (x TAIL) y)} y)), 
+        GEN=<x>(? x (APPEND (GEN (- x 1)) {HEAD=x, TAIL={}}) {})
+    } 
+    (GEN 3)
+)
