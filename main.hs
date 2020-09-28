@@ -228,4 +228,4 @@ main = do
   hSetEcho stdin False
   clear
   putStr "\ESC[?7l" -- disables line wrapping (VT100)
-  loop (head args) ((0,80,24),[],c)
+  loop (head args) ((0,80,24),[],(if null c then " " else c))
