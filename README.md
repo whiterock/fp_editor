@@ -1,5 +1,7 @@
 # fp_editor
  
+<img width="834" alt="Screenshot 2020-09-28 at 14 02 13" src="https://user-images.githubusercontent.com/6281495/94430294-ec3a5c00-0193-11eb-84a2-e343a463cfe1.png">
+ 
 Der Syntax-aufmerksame Editor fuer die funktionale Sprache aus Aufgabe 2 wurde in Haskell implementiert.
 
 ## how to compile
