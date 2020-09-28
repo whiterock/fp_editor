@@ -23,7 +23,7 @@ count x =  length . filter (==x)
 
 -- Gets us 6 different colors for an arbit. integer
 color :: Int -> [Char]
-color (v) = "\ESC[" ++ show (31 + (v `mod` 6)) ++ "m"
+color (v) = "\ESC[" ++ show (31 + (v `mod` 6)) ++ "m\ESC7"
 
 -- remaining string, position, position_to_watch, current_level, level_to_highlight
 type Stream = ([Char], Int, Maybe Int, Maybe Int, Int)
@@ -35,9 +35,9 @@ highlight (s, pos, pos_match_left, pos_match_right, lvl) -- pos_watch is unused 
     let next_level | head s == '(' || head s == '{' = lvl + 1
                    | head s == ')' || head s == '}' = lvl - 1
                    | otherwise = lvl
-        ret | next_level == lvl = if head s == '+' || head s == '-' || head s == '/' || head s == '*' || head s == '?' then "\ESC[1m" ++ [head s] ++ "\ESC[0m" else [head s]
-            | next_level > lvl = (color lvl ++ (if isJust pos_match_left && pos == fromJust pos_match_left then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m")
-            | otherwise = (color next_level ++ (if isJust pos_match_right && pos == fromJust pos_match_right then "\ESC[4m" else "") ++ [head s] ++ "\ESC[0m" )
+        ret | next_level == lvl = if head s == '+' || head s == '-' || head s == '/' || head s == '*' || head s == '?' then "\ESC[1m\ESC7" ++ [head s] ++ "\ESC[0m\ESC7" else [head s]
+            | next_level > lvl = (color lvl ++ (if isJust pos_match_left && pos == fromJust pos_match_left then "\ESC[4m\ESC7" else "") ++ [head s] ++ "\ESC[0m\ESC7")
+            | otherwise = (color next_level ++ (if isJust pos_match_right && pos == fromJust pos_match_right then "\ESC[4m\ESC7" else "") ++ [head s] ++ "\ESC[0m\ESC7" )
     ret ++ highlight (tail s, pos+1, pos_match_left, pos_match_right, next_level)
 
 
