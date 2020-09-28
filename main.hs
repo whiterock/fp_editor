@@ -153,13 +153,6 @@ editor ((skip,w,h),p,q)
 
     putStr $ unlines (take h $ drop skip $ lines r)
 
-    -- debugging begin --
-    --moveCursorTo 15 30
-    --putStr (show (fromMaybe 9 (findMatchRight (p++q, 0, length p, 0, Nothing))))
-    --putStr " "
-    --putStr (show (fromMaybe 9 (findMatchLeft (p++q, length (p++q) - 1, length p, 0, Nothing))))
-    -- debugging end --
-
     -- *** Status Bar *** --
     moveCursorTo (h+1) 0
     putStr "\ESC[7m"
@@ -172,10 +165,10 @@ editor ((skip,w,h),p,q)
     when (count '(' (p++q) /= count ')' (p++q)) (putStr " \ESC[31mError: Unbalanced '()'!\ESC[0m\ESC[7m")
     when (count '<' (p++q) /= count '>' (p++q)) (putStr " \ESC[31mError: Unbalanced '<>'!\ESC[0m\ESC[7m")
     when (count '{' (p++q) /= count '}' (p++q)) (putStr " \ESC[31mError: Unbalanced '{}'!\ESC[0m\ESC[7m")
-    --putStr $ show $ getWordUnderCursor (p,q)
-    --putStr $ show $ last $ words p
-    --putStr $ show $ head $ myWords q
+    moveCursorTo (h+1) (w-21)
+    putStr "^C: quit | <esc>: save"
     putStr "\ESC[0m"
+    
 
     -- Set cursor to actual cursor position
     moveCursorTo (current_line p - skip) (current_column p)
